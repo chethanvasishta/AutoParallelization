@@ -1,0 +1,104 @@
+Assignment 1 - Improve Floyd run time by parallelizing
+Where? - On the cluster - 16 nodes, 4 threads each. Use openmp to do threading and MPI for inter-node communication
+How?
+
+Overall, we need to 
+1. figure out dependencies
+2. Find a transformation to parallelize the loop
+3. Figure out the bounds for the transformation
+4. Rewrite the loops
+5. Use OpenMP and MPI to share work to different threads with different processors
+
+1. figure out dependencies
+floyd contains a single statement that is in a three level loop nesting. we need a three dimensional polyhedron that finds dependencies between iteration, i.e. k, i, j ranging from 0 to n-1 each, find the vectors <k', i', j'> and <k'', i'', j''> that access the same memory location. Let's take a small example of a 3 x 3 input and check how well we can parallelize it. This would be a good start.
+
+The statement is  dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j]);
+So there are three dependencies we need to look at 
+a) dist[i][j] and dist[i][j] (too trivial?)
+b) dist[i][j] and dist[i][k]
+b) dist[i][j] and dist[k][j]
+
+We 'll have three dependence polyhedrons (first one probably can be ignored but not sure).
+
+Let's plot all the three polyhedrons and see if we can parallelize the loops with all the dependencies described by these polyhedros satisfied!
+Enter the number of vertices
+( k i j ) : ( i j )  ( i j ) ( i k ) ( k j )
+
+( 0 0 0 ) : ( 0 0 )  ( 0 0 ) ( 0 0 ) ( 0 0 )
+( 0 0 1 ) : ( 0 1 )  ( 0 1 ) ( 0 0 ) ( 0 1 )
+( 0 0 2 ) : ( 0 2 )  ( 0 2 ) ( 0 0 ) ( 0 2 )
+( 0 1 0 ) : ( 1 0 )  ( 1 0 ) ( 1 0 ) ( 0 0 )
+( 0 1 1 ) : ( 1 1 )  ( 1 1 ) ( 1 0 ) ( 0 1 )
+( 0 1 2 ) : ( 1 2 )  ( 1 2 ) ( 1 0 ) ( 0 2 )
+( 0 2 0 ) : ( 2 0 )  ( 2 0 ) ( 2 0 ) ( 0 0 )
+( 0 2 1 ) : ( 2 1 )  ( 2 1 ) ( 2 0 ) ( 0 1 )
+( 0 2 2 ) : ( 2 2 )  ( 2 2 ) ( 2 0 ) ( 0 2 )
+( 1 0 0 ) : ( 0 0 )  ( 0 0 ) ( 0 1 ) ( 1 0 )
+( 1 0 1 ) : ( 0 1 )  ( 0 1 ) ( 0 1 ) ( 1 1 )
+( 1 0 2 ) : ( 0 2 )  ( 0 2 ) ( 0 1 ) ( 1 2 )
+( 1 1 0 ) : ( 1 0 )  ( 1 0 ) ( 1 1 ) ( 1 0 )
+( 1 1 1 ) : ( 1 1 )  ( 1 1 ) ( 1 1 ) ( 1 1 )
+( 1 1 2 ) : ( 1 2 )  ( 1 2 ) ( 1 1 ) ( 1 2 )
+( 1 2 0 ) : ( 2 0 )  ( 2 0 ) ( 2 1 ) ( 1 0 )
+( 1 2 1 ) : ( 2 1 )  ( 2 1 ) ( 2 1 ) ( 1 1 )
+( 1 2 2 ) : ( 2 2 )  ( 2 2 ) ( 2 1 ) ( 1 2 )
+( 2 0 0 ) : ( 0 0 )  ( 0 0 ) ( 0 2 ) ( 2 0 )
+( 2 0 1 ) : ( 0 1 )  ( 0 1 ) ( 0 2 ) ( 2 1 )
+( 2 0 2 ) : ( 0 2 )  ( 0 2 ) ( 0 2 ) ( 2 2 )
+( 2 1 0 ) : ( 1 0 )  ( 1 0 ) ( 1 2 ) ( 2 0 )
+( 2 1 1 ) : ( 1 1 )  ( 1 1 ) ( 1 2 ) ( 2 1 )
+( 2 1 2 ) : ( 1 2 )  ( 1 2 ) ( 1 2 ) ( 2 2 )
+( 2 2 0 ) : ( 2 0 )  ( 2 0 ) ( 2 2 ) ( 2 0 )
+( 2 2 1 ) : ( 2 1 )  ( 2 1 ) ( 2 2 ) ( 2 1 )
+( 2 2 2 ) : ( 2 2 )  ( 2 2 ) ( 2 2 ) ( 2 2 )
+
+Doing it by hand is a tedious task. We need to figure out 
+i. Is there a dependence? By the looks of it, We can see that there is a dependence but can we formally determine that there is a dependence (gcd test, power test, Fourier Motzkin or omega test ) ?
+ii. What is the dependence vector? 
+
+To answer (i) we need to check if there is a a[i][j] and a[i'][k'] such that [i][j] = [i'][k'] and check if there a a[i][j] = a[k'][j'] such that [i][j] = [k'][j'] given the linear inequalities
+
+i >= 0
+n-i-1 >=0
+j >= 0
+n-j-1 >=0
+k >= 0
+n-k-1 >=0 
+
+i' >= 0
+n-i'-1 >=0
+j' >= 0
+n-j'-1 >=0
+k' >= 0
+n-k'-1 >=0 
+
+The dependencies for the above iterations are as below
+
+ ( 0 0 0 ) depends on nothing.
+ ( 0 0 1 ) depends on  ( 0 0 0 ) 
+ ( 0 0 2 ) depends on  ( 0 0 0 ) 
+ ( 0 1 0 ) depends on  ( 0 0 0 ) 
+ ( 0 1 1 ) depends on  ( 0 1 0 )  ( 0 0 1 ) 
+ ( 0 1 2 ) depends on  ( 0 1 0 )  ( 0 0 2 ) 
+ ( 0 2 0 ) depends on  ( 0 0 0 ) 
+ ( 0 2 1 ) depends on  ( 0 2 0 )  ( 0 0 1 ) 
+ ( 0 2 2 ) depends on  ( 0 2 0 )  ( 0 0 2 ) 
+ ( 1 0 0 ) depends on  ( 0 1 0 )  ( 0 0 1 ) 
+ ( 1 0 1 ) depends on  ( 0 1 1 )  ( 0 0 1 ) 
+ ( 1 0 2 ) depends on  ( 1 0 1 )  ( 0 1 2 ) 
+ ( 1 1 0 ) depends on  ( 0 1 1 )  ( 0 1 0 ) 
+ ( 1 1 1 ) depends on  ( 0 1 1 )  ( 0 1 1 ) 
+ ( 1 1 2 ) depends on  ( 1 1 1 )  ( 0 1 2 ) 
+ ( 1 2 0 ) depends on  ( 1 1 0 )  ( 0 2 1 ) 
+ ( 1 2 1 ) depends on  ( 1 1 1 )  ( 0 2 1 ) 
+ ( 1 2 2 ) depends on  ( 1 2 1 )  ( 1 1 2 ) 
+ ( 2 0 0 ) depends on  ( 1 2 0 )  ( 1 0 2 ) 
+ ( 2 0 1 ) depends on  ( 1 2 1 )  ( 1 0 2 ) 
+ ( 2 0 2 ) depends on  ( 1 2 2 )  ( 1 0 2 ) 
+ ( 2 1 0 ) depends on  ( 1 2 0 )  ( 1 1 2 ) 
+ ( 2 1 1 ) depends on  ( 1 2 1 )  ( 1 1 2 ) 
+ ( 2 1 2 ) depends on  ( 1 2 2 )  ( 1 1 2 ) 
+ ( 2 2 0 ) depends on  ( 1 2 2 )  ( 1 2 0 ) 
+ ( 2 2 1 ) depends on  ( 1 2 2 )  ( 1 2 1 ) 
+ ( 2 2 2 ) depends on  ( 1 2 2 )  ( 1 2 2 ) 
+

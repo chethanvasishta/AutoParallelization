@@ -4,6 +4,7 @@
 #include <list>
 #include <queue>
 #include <algorithm>
+#include <fstream>
 using namespace std;
 
 #define INF 1000
@@ -86,16 +87,41 @@ public:
 			printNode(*headIter, 0);	
 		}		
 	}
+
+    void printDot(){
+        ofstream dotFile;
+        dotFile.open("dep.dot", ios::out);
+        dotFile << "digraph { " << endl;
+    	list<struct Node*>::iterator headIter = m_heads.begin();
+		for(; headIter != m_heads.end() ; ++ headIter){
+			printNodeDot(dotFile, *headIter);	
+            dotFile << "\"(" <<  (*headIter)->kij.k << "," << (*headIter)->kij.i << "," << (*headIter)->kij.j << ")\"" << endl;
+		}
+        dotFile << "}";
+
+        
+    }
 private:
 	void printNode(struct Node* n, int level){
 		for(int i = 0 ; i < level; ++i)	
-			cout << "-";
+			cout << "--";
 		cout << " ( " <<  n->kij.k << " " << n->kij.i << " " << n->kij.j << " ) " << endl;
 		list<struct Node*>::iterator childIter = n->m_children.begin();
 		for(; childIter != n->m_children.end(); ++childIter)
 			printNode(*childIter, level+1);
 	}
-	
+
+    void printNodeDot(ofstream& dotFile, struct Node* n){
+		//for(int i = 0 ; i < level; ++i)	
+		//	cout << "--";
+		//cout << " ( " <<  n->kij.k << " " << n->kij.i << " " << n->kij.j << " ) " << endl;
+		list<struct Node*>::iterator childIter = n->m_children.begin();
+		for(; childIter != n->m_children.end(); ++childIter){
+            dotFile << "\"(" <<  n->kij.k << "," << n->kij.i << "," << n->kij.j << ")\"->";
+            dotFile << "\"(" <<  (*childIter)->kij.k << "," << (*childIter)->kij.i << "," << (*childIter)->kij.j << ")\"" << endl;
+			printNodeDot(dotFile, *childIter);
+        }
+	}
 	list<struct Node*> m_heads; //we might have more than one graph
 	
 };
@@ -164,6 +190,7 @@ int main() {
 			}
 	constructDepGraph(&depsList);
 	gDepGraphs.print();
+	gDepGraphs.printDot();
 	//print(dist, n);	
 	return 0;
 }

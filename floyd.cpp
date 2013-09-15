@@ -3,6 +3,7 @@
 #include <time.h>
 #include <list>
 #include <queue>
+#include <algorithm>
 using namespace std;
 
 #define INF 1000
@@ -31,6 +32,8 @@ public:
 struct Node{
 	struct KIJ kij;
 	list<struct Node*> m_children;
+	
+	Node(struct KIJ kij1) : kij(kij1) {}
 };
 
 class DepGraphs {
@@ -39,7 +42,15 @@ public:
 		struct Node* fromNode = findNode(parent);
 		if(fromNode == NULL)
 			addNode(parent);
-				
+		fromNode = findNode(parent);
+		struct Node *childNode = findNode(child);
+		if(childNode == NULL)
+			addNode(child);
+		childNode = findNode(child);
+		fromNode->m_children.push_back(childNode);
+		std::list<struct Node*>::iterator childIter = std::find(m_heads.begin(), m_heads.end(), childNode);
+		if(childIter != m_heads.end())
+			m_heads.remove(childNode);
 	}
 
 	struct Node* findNode(struct KIJ* key){
@@ -57,17 +68,34 @@ public:
 					nodeQ.push(*childIter);
 			}
 		}
-			
-		
 		return NULL;
 	}
 	
 	void addNode(struct KIJ* kij){
 		if(findNode(kij) != NULL)
 			return;
-		struct Node* newNode = new struct Node();	
+		struct Node* newNode = new struct Node(*kij);
+		m_heads.push_back(newNode);
+	}
+
+	
+
+	void print(){
+		list<struct Node*>::iterator headIter = m_heads.begin();
+		for(; headIter != m_heads.end() ; ++ headIter){
+			printNode(*headIter, 0);	
+		}		
 	}
 private:
+	void printNode(struct Node* n, int level){
+		for(int i = 0 ; i < level; ++i)	
+			cout << "-";
+		cout << " ( " <<  n->kij.k << " " << n->kij.i << " " << n->kij.j << " ) " << endl;
+		list<struct Node*>::iterator childIter = n->m_children.begin();
+		for(; childIter != n->m_children.end(); ++childIter)
+			printNode(*childIter, level+1);
+	}
+	
 	list<struct Node*> m_heads; //we might have more than one graph
 	
 };
@@ -78,17 +106,19 @@ void constructDepGraph(list<struct DEPS*> *depsList){
 	list<struct DEPS*>::reverse_iterator curIter = depsList->rbegin();
 	for(; curIter != depsList->rend(); ++curIter){
 		list<struct DEPS*>::reverse_iterator prevEltIter = curIter;
+		gDepGraphs.addNode(&((*curIter)->kij));
 		++prevEltIter;		
 		cout << " ( " << (*curIter)->kij.k << " " << (*curIter)->kij.i << " " << (*curIter)->kij.j << " ) depends on ";
 		bool foundik = false, foundkj = false;
 		while(prevEltIter != depsList->rend() && !(foundik && foundkj)){
 			if(!foundik && (*curIter)->ik == (*prevEltIter)->ij){
 				cout << " ( " << (*prevEltIter)->kij.k << " " << (*prevEltIter)->kij.i << " " << (*prevEltIter)->kij.j << " ) ";
-				
+				gDepGraphs.addDependency(&(*prevEltIter)->kij, &(*curIter)->kij);	
 				foundik = true;
 			}
 			if(!foundkj && (*curIter)->kj == (*prevEltIter)->ij){
 				cout << " ( " << (*prevEltIter)->kij.k << " " << (*prevEltIter)->kij.i << " " << (*prevEltIter)->kij.j << " ) ";
+				gDepGraphs.addDependency(&(*prevEltIter)->kij, &(*curIter)->kij);	
 				foundkj = true;
 			}
 			++prevEltIter;	
@@ -133,6 +163,7 @@ int main() {
 				dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j]);
 			}
 	constructDepGraph(&depsList);
+	gDepGraphs.print();
 	//print(dist, n);	
 	return 0;
 }

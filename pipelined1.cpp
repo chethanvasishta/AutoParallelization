@@ -84,11 +84,41 @@ int main(){
 
     gettimeofday(&after, NULL);
     
-    cout << "Parallel execution took " << time_diff(before, after) << " milliseconds " << endl;
+    cout << "Parallel execution along j took " << time_diff(before, after) << " milliseconds " << endl;
 
 #if SANITY_CHECK
    
     cout << "Parallelization is " << (isEqual(dist, distPar,n) ? "sane" : "insane") << endl;
+    
+#endif //SANITY_CHECK
+
+    //copy back
+    
+    for(int i = 0 ; i < n ; ++i){
+        for(int j = 0 ; j < n ; ++j){
+            distPar[i][j] = distCopy[i][j];
+        }
+    }
+
+    //parallel with i
+    //Might be slower than j because of caching issues
+    
+    gettimeofday(&before, NULL);
+   
+    for(int i = 0 ; i < n ; ++i){
+#pragma omp parallel for
+        for(int j = n-1 ; j >= 0 ; --j){
+            distPar[i][j] = distPar[j][i];
+        }
+    }
+
+    gettimeofday(&after, NULL);
+    
+    cout << "Parallel execution along i took " << time_diff(before, after) << " milliseconds " << endl;
+
+#if SANITY_CHECK
+   
+    cout << "Parallelization is " << (isEqual(dist, distPar, n) ? "sane" : "insane") << endl;
     
 #endif //SANITY_CHECK
 

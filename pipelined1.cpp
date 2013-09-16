@@ -74,8 +74,9 @@ int main(){
     //parallel with j
     
     gettimeofday(&before, NULL);
-    
+   
     for(int j = n-1 ; j >= 0 ; --j){
+#pragma omp parallel for
         for(int i = 0 ; i < n ; ++i){
             distPar[i][j] = distPar[j][i];
         }

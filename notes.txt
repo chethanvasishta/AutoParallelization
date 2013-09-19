@@ -68,7 +68,7 @@ n-k-1 >=0
 i' >= 0
 n-i'-1 >=0
 j' >= 0
-n-j'-1 >=0
+n-j'-1 >=
 k' >= 0
 n-k'-1 >=0 
 
@@ -103,3 +103,5 @@ The dependencies for the above iterations are as below
  ( 2 2 2 ) depends on  ( 1 2 2 )  ( 1 2 2 ) 
 
 A graph of the dependencies for n = 3 can be seen at floyd3V.png. As we can see, it is nearly impossible to find out the parallel schedule for the graph manually. Hence we need to figure out a way to find the dependency distance vectors or the direction vectors for each of the dependencies.
+
+An interesting observation is that we don't need to compute min distance if either of i or j is equal to k. This reduces the dependency graph by a huge extent and makes it clearer.

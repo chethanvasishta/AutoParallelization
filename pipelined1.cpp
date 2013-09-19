@@ -56,6 +56,7 @@ double doParallelJ(int **a, int n){
     gettimeofday(&before, NULL);
 
     for(int j = n-1 ; j >= 0 ; --j){
+omp_set_num_threads(8);
 #pragma omp parallel for
         for(int i = 0 ; i < n ; ++i){
             a[i][j] = a[j][i];
@@ -74,6 +75,7 @@ double doParallelI(int **a, int n){
     gettimeofday(&before, NULL);
 
     for(int i = 0 ; i < n ; ++i){
+omp_set_num_threads(8);
 #pragma omp parallel for
         for(int j = n-1 ; j >= 0 ; --j){
             a[i][j] = a[j][i];

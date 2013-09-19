@@ -163,20 +163,34 @@ void print(int **p, int n){
 	}
 }
 
+bool isEqual(int **a, int **b, int n){
+
+    for(int i = 0 ; i < n ; ++i)
+        for(int j = 0 ; j < n ; ++j)
+            if(a[i][j] != b[i][j])
+                return false;
+    return true;
+
+}
+
 int main() {
 	
-	int **dist, n;
+	int **dist, **distPar, n;
 	cout << "Enter the number of vertices" << endl;
 	cin >> n;
 	
 	dist = new int*[n];	
+    distPar = new int*[n];
 
 	srand(time(NULL));
 
 	for(int i = 0 ; i < n ; ++i){
 		dist[i] = new int[n];
-		for(int j = 0 ; j < n ; ++j)
+        distPar[i] = new int[n];
+		for(int j = 0 ; j < n ; ++j){
 			dist[i][j] = rand()%100;
+            distPar[i][j] = dist[i][j];
+        }
 	}
 	
 	list<struct DEPS*> depsList;
@@ -185,11 +199,25 @@ int main() {
 		for(int i = 0 ; i < n ; ++i)
 			for(int j = 0 ; j < n ; ++j){
 //				cout << "< " << k << " " << i << " " << j << " > : < " << i << " " << j << " >  < " << i << " " << j << " > < "<< i << " " << k << " > < " << k << " " << j << " >" << endl; 
-				depsList.push_back(new struct DEPS(*(new struct KIJ(k,i,j)), pair<int,int>(i,j), pair<int,int>(i,k), pair<int,int>(k,j)));
+//				depsList.push_back(new struct DEPS(*(new struct KIJ(k,i,j)), pair<int,int>(i,j), pair<int,int>(i,k), pair<int,int>(k,j)));
 				dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j]);
 			}
+
+    //improved floyd
+    for(int k = 0 ; k < n ; ++k)
+        for(int i = 0 ; i < n ; ++i)
+            for(int j = 0 ; j < n ; ++j){
+                if(i != k && j != k)
+//				cout << "< " << k << " " << i << " " << j << " > : < " << i << " " << j << " >  < " << i << " " << j << " > < "<< i << " " << k << " > < " << k << " " << j << " >" << endl; 
+				depsList.push_back(new struct DEPS(*(new struct KIJ(k,i,j)), pair<int,int>(i,j), pair<int,int>(i,k), pair<int,int>(k,j)));
+                distPar[i][j] = min(distPar[i][j], distPar[i][k] + distPar[k][j]);
+            }
+        
+    cout << "New floyd " << (isEqual(dist, distPar, n) ? "valid" : "invalid") << endl; 
+
+
 	constructDepGraph(&depsList);
-	gDepGraphs.print();
+	//gDepGraphs.print();
 	gDepGraphs.printDot();
 	//print(dist, n);	
 	return 0;

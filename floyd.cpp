@@ -5,9 +5,13 @@
 #include <queue>
 #include <algorithm>
 #include <fstream>
+#include "helper.h"
+#include <sys/time.h>
+#include <omp.h>
 using namespace std;
 
 #define INF 1000
+#define SANITY_CHECK 1
 
 struct KIJ {
 	int i;
@@ -155,70 +159,95 @@ void constructDepGraph(list<struct DEPS*> *depsList){
 	}
 }
 
-void print(int **p, int n){
-	for(int i = 0 ; i < n ; ++i){
-		for(int j = 0 ; j < n ; ++j)
-			cout << p[i][j] << " ";
-		cout << endl;
-	}
+double doFloyd(int **dist, int n){
+    struct timeval before, after;
+
+    gettimeofday(&before, NULL);
+
+   //cout << "< k i j > : < i j >  < i j > < i k > < k j >" << endl;
+    for(int k = 0 ; k < n ; ++k)
+        for(int i = 0 ; i < n ; ++i)
+            for(int j = 0 ; j < n ; ++j){
+                //cout << "< " << k << " " << i << " " << j << " > : < " << i << " " << j << " >  < " << i << " " << j << " > < "<< i << " " << k << " > < " << k << " " << j << " >" << endl; 
+                //depsList.push_back(new struct DEPS(*(new struct KIJ(k,i,j)), pair<int,int>(i,j), pair<int,int>(i,k), pair<int,int>(k,j)));
+                dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j]);
+            }
+
+    gettimeofday(&after, NULL);
+
+    return time_diff(before, after);
 }
 
-bool isEqual(int **a, int **b, int n){
+double doParFloyd(int **distPar, int n){
+    struct timeval before, after;
 
-    for(int i = 0 ; i < n ; ++i)
-        for(int j = 0 ; j < n ; ++j)
-            if(a[i][j] != b[i][j])
-                return false;
-    return true;
+    gettimeofday(&before, NULL);
+    for(int k = 0 ; k < n ; ++k)
+#pragma omp parallel for
+        for(int i = 0 ; i < n ; ++i) {
+            for(int j = 0 ; j < n ; ++j){
+//                if(i != k && j != k)
+                    distPar[i][j] = min(distPar[i][j], distPar[i][k] + distPar[k][j]);
+            }
+        }
+
+    gettimeofday(&after, NULL);
+
+    return time_diff(before, after);
 
 }
 
 int main() {
 	
-	int **dist, **distPar, n;
+	int **dist, **distPar, **distCopy, n;
 	cout << "Enter the number of vertices" << endl;
 	cin >> n;
 	
 	dist = new int*[n];	
     distPar = new int*[n];
+    distCopy = new int*[n];
 
 	srand(time(NULL));
 
 	for(int i = 0 ; i < n ; ++i){
 		dist[i] = new int[n];
+		distCopy[i] = new int[n];
         distPar[i] = new int[n];
 		for(int j = 0 ; j < n ; ++j){
-			dist[i][j] = rand()%100;
-            distPar[i][j] = dist[i][j];
+			distCopy[i][j] = rand()%100;
         }
 	}
-	
-	list<struct DEPS*> depsList;
-	cout << "< k i j > : < i j >  < i j > < i k > < k j >" << endl;
-	for(int k = 0 ; k < n ; ++k)
-		for(int i = 0 ; i < n ; ++i)
-			for(int j = 0 ; j < n ; ++j){
-//				cout << "< " << k << " " << i << " " << j << " > : < " << i << " " << j << " >  < " << i << " " << j << " > < "<< i << " " << k << " > < " << k << " " << j << " >" << endl; 
-//				depsList.push_back(new struct DEPS(*(new struct KIJ(k,i,j)), pair<int,int>(i,j), pair<int,int>(i,k), pair<int,int>(k,j)));
-				dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j]);
-			}
+    
+    cout << "Done Intializing" << endl;
+	//list<struct DEPS*> depsList;
+    
+    cout << "Running sequential floyd..." << endl;
+    const int iterations = 25;
+    double* floydTime = new double[iterations];
+    for(int i = 0 ; i < iterations ; ++i){
+        copy(distCopy, dist, n);
+        floydTime[i] = doFloyd(dist, n);
+    }
 
-    //improved floyd
-    for(int k = 0 ; k < n ; ++k)
-        for(int i = 0 ; i < n ; ++i)
-            for(int j = 0 ; j < n ; ++j){
-                if(i != k && j != k)
-//				cout << "< " << k << " " << i << " " << j << " > : < " << i << " " << j << " >  < " << i << " " << j << " > < "<< i << " " << k << " > < " << k << " " << j << " >" << endl; 
-				depsList.push_back(new struct DEPS(*(new struct KIJ(k,i,j)), pair<int,int>(i,j), pair<int,int>(i,k), pair<int,int>(k,j)));
-                distPar[i][j] = min(distPar[i][j], distPar[i][k] + distPar[k][j]);
-            }
-        
+    cout << "Floyd Sequential : Mean - " << average(floydTime, iterations) << "ms, Median - " << median(floydTime, iterations) << "ms." << endl;
+
+    cout << "Running parallel floyd..." << endl;
+    double* parfloydTime = new double[iterations];
+    for(int i = 0 ; i < iterations ; ++i){
+        copy(distCopy, distPar, n);
+        parfloydTime[i] = doParFloyd(distPar, n);
+    }
+
+    cout << "Floyd Parallel : Mean - " << average(parfloydTime, iterations) << "ms, Median - " << median(parfloydTime, iterations) << "ms." << endl;
+
+
+#if SANITY_CHECK   
     cout << "New floyd " << (isEqual(dist, distPar, n) ? "valid" : "invalid") << endl; 
+#endif
 
-
-	constructDepGraph(&depsList);
+	//constructDepGraph(&depsList);
 	//gDepGraphs.print();
-	gDepGraphs.printDot();
+	//gDepGraphs.printDot();
 	//print(dist, n);	
 	return 0;
 }
